@@ -1,22 +1,28 @@
 ---
 dependency:
   name: galaxy
+
 driver:
   name: docker
-lint: |
-  ansible-lint .
-  flake8
+
 platforms:
-  - name: instance
-    image: "geerlingguy/docker-${MOLECULE_DISTRO:-centos8}-ansible:latest"
+  - name: alagent-instance
+    image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
     command: ${MOLECULE_DOCKER_COMMAND:-""}
+    cgroupns_mode: host
     volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     privileged: true
     pre_build_image: true
+
 provisioner:
   name: ansible
+  env:
+    # Provisioning and agent configuration need a real Alert Logic
+    # registration key, so skip those steps in test containers.
+    ANSIBLE_SKIP_TAGS: provision_al_agent,configure_al_agent
   playbooks:
     converge: ${MOLECULE_PLAYBOOK:-converge.yml}
+
 verifier:
-  name: testinfra
+  name: ansible

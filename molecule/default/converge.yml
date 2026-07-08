@@ -4,14 +4,13 @@
   become: true
 
   pre_tasks:
-    - name: Install GnuPG for apt key import.
+    - name: Update the apt cache.
       ansible.builtin.apt:
-        name:
-          - gnupg
         update_cache: true
-      register: install_result
+        cache_valid_time: 3600
+      register: apt_cache_result
       retries: 3
-      until: install_result is success
+      until: apt_cache_result is success
       when: ansible_os_family == "Debian"
 
   roles:

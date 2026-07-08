@@ -1,4 +1,7 @@
 ---
-
 # KLUDGE: See https://github.com/alertlogic/al-agents-ansible-playbooks/issues/32
 disable_gpg_check: false
+
+# Install the agent but leave it unprovisioned and stopped so an instance
+# snapshot can be captured for later reuse as a machine image.
+al_agent_for_imaging: false

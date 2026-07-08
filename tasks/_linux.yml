@@ -1,42 +1,47 @@
 ---
-
-- name: Include Ansible OS family variables
+- name: Include Ansible OS family variables.
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
-  tags: always
+  tags:
+    - always
 
-- name: Include Agent installation file
-  include: install_agent.yml
-  tags: [install_agent]
+- name: Include agent installation tasks.
+  ansible.builtin.include_tasks: install_agent.yml
+  tags:
+    - install_agent
 
-- name: Test for Agent Provisioned
+- name: Test for the agent host key from a previous provisioning.
   ansible.builtin.stat:
     path: /var/alertlogic/etc/host_key.pem
   register: agent_provisioned
-  ignore_errors: true
   tags:
     - configure_al_agent
     - provision_al_agent
 
-- name: Include Agent optional configuration file
-  include: configure_agent.yml
-  tags: [configure_al_agent]
+- name: Include agent optional configuration tasks.
+  ansible.builtin.include_tasks: configure_agent.yml
+  tags:
+    - configure_al_agent
 
-- name: Include Agent Provisioning file
-  include: provision_agent.yml
-  tags: [provision_al_agent]
+- name: Include agent provisioning tasks.
+  ansible.builtin.include_tasks: provision_agent.yml
+  tags:
+    - provision_al_agent
 
-- name: Include configuration steps required for log collection in Linux
-  include: configure_loggers.yml
-  tags: [provision_al_agent]
+- name: Include configuration steps required for log collection in Linux.
+  ansible.builtin.include_tasks: configure_loggers.yml
+  tags:
+    - provision_al_agent
 
-- name: Include check for SELinux policy requirements
-  include: selinux.yml
-  tags: [selinux]
+- name: Include check for SELinux policy requirements.
+  ansible.builtin.include_tasks: selinux.yml
+  tags:
+    - selinux
 
-- name: Start the Alert Logic Agent service
+- name: Start the Alert Logic Agent service.
   ansible.builtin.service:
     name: al-agent
     state: started
     enabled: true
-  tags: install_al_agent
+  tags:
+    - install_al_agent
   when: not al_agent_for_imaging

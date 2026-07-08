@@ -1,0 +1,56 @@
+---
+argument_specs:
+  main:
+    short_description: Configure and Install Alert Logic Agents.
+    description:
+      - Installs the Alert Logic agent from the vendor download site,
+        optionally configures egress and proxy settings, provisions the
+        agent with a registration key, and configures rsyslog or syslog-ng
+        to forward logs to the agent.
+    author:
+      - Craig Davis
+    options:
+      disable_gpg_check:
+        type: bool
+        default: false
+        description: >-
+          Disable GPG signature checking when installing the agent RPM on
+          RedHat-family systems. Workaround for
+          https://github.com/alertlogic/al-agents-ansible-playbooks/issues/32.
+
+      al_agent_for_imaging:
+        type: bool
+        default: false
+        description: >-
+          When true, install the agent but skip provisioning and do not
+          start the service, so an instance snapshot can be captured for
+          later reuse as a machine image.
+
+      al_agent_registration_key:
+        type: str
+        required: false
+        description: >-
+          Alert Logic registration key used to provision the agent.
+          Optional in supported cloud deployments (AWS, Azure) where the
+          agent can self-provision.
+
+      al_agent_egress_host:
+        type: str
+        required: false
+        description: >-
+          Hostname or IP address of a single point of egress (for example
+          a NAT instance) that the agent should send its traffic through.
+
+      al_agent_egress_port:
+        type: int
+        required: false
+        description: >-
+          TCP port used together with al_agent_egress_host for agent
+          egress traffic. The upstream default is 443.
+
+      al_agent_proxy_url:
+        type: str
+        required: false
+        description: >-
+          Proxy URL for agent traffic when a proxy is required to reach
+          Alert Logic. Ensure it is a properly formatted URI.

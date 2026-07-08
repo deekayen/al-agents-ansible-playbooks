@@ -1,22 +1,31 @@
 ---
-
-- name: Set Linux optional facts
+- name: Set Linux optional facts.
   ansible.builtin.set_fact:
     al_agent_provision_options: []
 
-- name: Set Linux optional fact for using a registration key
+- name: Set Linux optional fact for using a registration key.
   ansible.builtin.set_fact:
-    al_agent_provision_options: "{{ al_agent_provision_options  +  [ \"--key \" +  al_agent_registration_key  ] }}"
-  when: al_agent_registration_key is defined and al_agent_registration_key != "your_registration_key_here"
+    al_agent_provision_options: "{{ al_agent_provision_options + ['--key ' ~ al_agent_registration_key] }}"
+  when:
+    - al_agent_registration_key is defined
+    - al_agent_registration_key != "your_registration_key_here"
 
-- name: Provision Alert Logic Agent
+- name: Provision Alert Logic Agent.
   ansible.builtin.command: "/etc/init.d/al-agent provision {{ al_agent_provision_options | join(' ') }}"
+  changed_when: true
   notify:
-    - restart al-agent
-  tags: provision_al_agent
-  when: not al_agent_for_imaging and not agent_provisioned.stat.exists and al_agent_provision_options != "[]"
+    - Restart al-agent.
+  tags:
+    - provision_al_agent
+  when:
+    - not al_agent_for_imaging
+    - not agent_provisioned.stat.exists
 
-- name: Provision Alert Logic Agent - for Imaging
+- name: Provision Alert Logic Agent for imaging.
   ansible.builtin.command: "/etc/init.d/al-agent provision {{ al_agent_provision_options | join(' ') }}"
-  tags: provision_al_agent
-  when: al_agent_for_imaging and not agent_provisioned.stat.exists and al_agent_provision_options != "[]"
+  changed_when: true
+  tags:
+    - provision_al_agent
+  when:
+    - al_agent_for_imaging
+    - not agent_provisioned.stat.exists

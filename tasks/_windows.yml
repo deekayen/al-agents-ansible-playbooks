@@ -1,71 +1,82 @@
 ---
-
-- name: Get Windows Agent installation status
-  win_stat:
+- name: Get Windows Agent installation status.
+  ansible.windows.win_stat:
     path: 'C:\Program Files (x86)\Common Files\AlertLogic\host_key.pem'
   register: al_agent_skip_provision
 
-- name: Set Windows facts
+- name: Set Windows facts.
   ansible.builtin.set_fact:
     al_agent_windows_options: []
 
 # SENSOR_HOST, SENSOR_PORT, USE_PROXY, PROV_NOW, PROV_KEY, PROV_ONLY, INSTALL_ONLY
-- name: Set Windows fact for imaging installation "INSTALL_ONLY"
+- name: Set Windows fact for imaging installation INSTALL_ONLY.
   ansible.builtin.set_fact:
-    al_agent_windows_options: "{{ al_agent_windows_options + [ \"INSTALL_ONLY=1\" ] }}"
+    al_agent_windows_options: "{{ al_agent_windows_options + ['INSTALL_ONLY=1'] }}"
   when: al_agent_skip_provision.stat.exists or al_agent_for_imaging
 
-- name: Set Windows fact for imaging installation "PROV_NOW"
+- name: Set Windows fact for imaging installation PROV_NOW.
   ansible.builtin.set_fact:
-    al_agent_windows_options: "{{ al_agent_windows_options + [ \"PROV_NOW=0\" ] }}"
+    al_agent_windows_options: "{{ al_agent_windows_options + ['PROV_NOW=0'] }}"
   when: al_agent_skip_provision.stat.exists or al_agent_for_imaging
 
-- name: Set Windows fact for use of proxy url
+- name: Set Windows fact for use of proxy URL.
   ansible.builtin.set_fact:
-    al_agent_windows_options: "{{ al_agent_windows_options + [ \"USE_PROXY=\" + al_agent_proxy_url ] }}"
-  when: al_agent_proxy_url is defined and not al_agent_skip_provision.stat.exists and not al_agent_for_imaging
+    al_agent_windows_options: "{{ al_agent_windows_options + ['USE_PROXY=' ~ al_agent_proxy_url] }}"
+  when:
+    - al_agent_proxy_url is defined
+    - not al_agent_skip_provision.stat.exists
+    - not al_agent_for_imaging
 
-- name: Set Windows fact for single point of egress host's ip
+- name: Set Windows fact for single point of egress host.
   ansible.builtin.set_fact:
-    al_agent_windows_options: "{{ al_agent_windows_options + [ \"SENSOR_HOST=\" + al_agent_egress_host ] }}"
-  when: al_agent_egress_host is defined and not al_agent_skip_provision.stat.exists and not al_agent_for_imaging
+    al_agent_windows_options: "{{ al_agent_windows_options + ['SENSOR_HOST=' ~ al_agent_egress_host] }}"
+  when:
+    - al_agent_egress_host is defined
+    - not al_agent_skip_provision.stat.exists
+    - not al_agent_for_imaging
 
-- name: Set Windows fact for single point of egress port (default is 443)
+- name: Set Windows fact for single point of egress port (default is 443).
   ansible.builtin.set_fact:
-    al_agent_windows_options: "{{ al_agent_windows_options + [ \"SENSOR_PORT=\" + al_agent_egress_port ] }}"
-  when: al_agent_egress_port is defined and not al_agent_skip_provision.stat.exists and not al_agent_for_imaging
+    al_agent_windows_options: "{{ al_agent_windows_options + ['SENSOR_PORT=' ~ al_agent_egress_port] }}"
+  when:
+    - al_agent_egress_port is defined
+    - not al_agent_skip_provision.stat.exists
+    - not al_agent_for_imaging
 
-- name: Set Windows fact for use of a registration key
+- name: Set Windows fact for use of a registration key.
   ansible.builtin.set_fact:
-    al_agent_windows_options: "{{ al_agent_windows_options + [ \"PROV_KEY=\" + al_agent_registration_key ] }}"
-  when: not al_agent_skip_provision.stat.exists and al_agent_registration_key is defined and not al_agent_for_imaging
+    al_agent_windows_options: "{{ al_agent_windows_options + ['PROV_KEY=' ~ al_agent_registration_key] }}"
+  when:
+    - not al_agent_skip_provision.stat.exists
+    - al_agent_registration_key is defined
+    - not al_agent_for_imaging
 
-- name: Join all Windows optional facts as a single variable
+- name: Join all Windows optional facts as a single variable.
   ansible.builtin.set_fact:
     al_agent_windows: "{{ al_agent_windows_options | join(' ') }}"
 
-- name: Set Windows TEMP directory
-  win_stat:
+- name: Get Windows TEMP directory status.
+  ansible.windows.win_stat:
     path: 'C:/TEMP'
   register: al_agent_temp_dir
 
-- name: Check if Windows TEMP directory exists
-  win_file:
+- name: Create the Windows TEMP directory.
+  ansible.windows.win_file:
     path: 'C:/TEMP'
     state: directory
   when: not al_agent_temp_dir.stat.exists
 
-- name: Set Windows Agent package URL
-  win_get_url:
+- name: Download the Alert Logic Agent installer.
+  ansible.windows.win_get_url:
     url: 'https://scc.alertlogic.net/software/al_agent-LATEST.msi'
     dest: 'C:/TEMP/al_agent-LATEST.msi'
     force: false
 
-- name: Set Windows debug
+- name: Show the Windows installer options.
   ansible.builtin.debug:
     var: al_agent_windows
 
-- name: Install Alert Logic Agent on Windows
-  win_package:
+- name: Install Alert Logic Agent on Windows.
+  ansible.windows.win_package:
     path: 'C:\TEMP\al_agent-LATEST.msi'
     arguments: "{{ al_agent_windows }}"

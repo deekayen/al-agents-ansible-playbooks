@@ -1,60 +1,51 @@
 ---
+# apt-key is deprecated and rejects this key on Debian 12+ and Ubuntu 22.04+,
+# so install the vendor key as an apt trusted.gpg.d fragment instead.
+- name: Import Alert Logic Atlas GPG key on Debian/Ubuntu.
+  ansible.builtin.get_url:
+    url: "{{ al_agent_gpg_key }}"
+    dest: /etc/apt/trusted.gpg.d/alertlogic.asc
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_os_family == "Debian"
 
-- block:
-    - name: Import Alert Logic Atlas GPG key on Debian/Ubuntu.
-      ansible.builtin.apt_key:
-        id: "{{ al_agent_gpg_fingerprint }}"
-        url: "{{ al_agent_gpg_key }}"
-        state: present
-      when: ansible_os_family == "Debian"
+- name: Install Alert Logic Agent on Debian/Ubuntu.
+  ansible.builtin.apt:
+    deb: "{{ al_agent_pkg_url }}"
+  register: install_result
+  retries: 3
+  until: install_result is success
+  tags:
+    - install_al_agent
+  when: ansible_os_family == "Debian"
 
-    - name: Install Alert Logic Agent on Debian/Ubuntu.
-      ansible.builtin.apt:
-        deb: "{{ al_agent_pkg_url }}"
-      tags: install_al_agent
-      register: install_result
-      retries: 3
-      until: install_result is success
-      when: ansible_os_family == "Debian"
+- name: Import Alert Logic Atlas GPG key on CentOS/RHEL.
+  ansible.builtin.rpm_key:
+    key: "{{ al_agent_gpg_key }}"
+    fingerprint: "{{ al_agent_gpg_fingerprint }}"
+    state: present
+  when: ansible_os_family == "RedHat"
 
-    - name: Import Alert Logic Atlas GPG key on CentOS/RHEL.
-      ansible.builtin.rpm_key:
-        key: "{{ al_agent_gpg_key }}"
-        fingerprint: "{{ al_agent_gpg_fingerprint }}"
-        state: present
-      when:
-        - ansible_os_family == "RedHat"
+- name: Install Alert Logic Agent on CentOS/RHEL/Amazon.
+  ansible.builtin.dnf:
+    name: "{{ al_agent_pkg_url }}"
+    state: present
+    disable_gpg_check: "{{ disable_gpg_check }}"
+  register: install_result
+  retries: 3
+  until: install_result is success
+  tags:
+    - install_al_agent
+  when: ansible_os_family == "RedHat"
 
-    - name: Install Alert Logic Agent on CentOS/RHEL.
-      ansible.builtin.yum:
-        name: "{{ al_agent_pkg_url }}"
-        state: present
-        disable_gpg_check: "{{ disable_gpg_check }}"
-      tags: install_al_agent
-      register: install_result
-      retries: 3
-      until: install_result is success
-      when:
-        - ansible_os_family == "RedHat"
-
-    - name: Install Alert Logic Agent on CentOS/RHEL/Amazon.
-      ansible.builtin.package:
-        name: "{{ al_agent_pkg_url }}"
-        state: present
-      tags: install_al_agent
-      register: install_result
-      retries: 3
-      until: install_result is success
-      when:
-        - ansible_os_family != "Debian"
-        - ansible_os_family != "Suse"
-
-    - name: Install Alert Logic Agent on Suse.
-      zypper:
-        name: "{{ al_agent_pkg_url }}"
-        state: present
-      tags: install_al_agent
-      register: install_result
-      retries: 3
-      until: install_result is success
-      when: ansible_os_family == "Suse"
+- name: Install Alert Logic Agent on Suse.
+  community.general.zypper:
+    name: "{{ al_agent_pkg_url }}"
+    state: present
+  register: install_result
+  retries: 3
+  until: install_result is success
+  tags:
+    - install_al_agent
+  when: ansible_os_family == "Suse"

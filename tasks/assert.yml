@@ -1,0 +1,33 @@
+---
+- name: Assert al_agent_registration_key is not empty when defined.
+  ansible.builtin.assert:
+    that:
+      - al_agent_registration_key | length > 0
+    fail_msg: "al_agent_registration_key must not be an empty string."
+    quiet: true
+  when: al_agent_registration_key is defined
+
+- name: Assert al_agent_egress_port is a valid TCP port when defined.
+  ansible.builtin.assert:
+    that:
+      - al_agent_egress_port | int >= 1
+      - al_agent_egress_port | int <= 65535
+    fail_msg: "al_agent_egress_port must be between 1 and 65535, got: {{ al_agent_egress_port }}"
+    quiet: true
+  when: al_agent_egress_port is defined
+
+- name: Assert al_agent_egress_host is not empty when defined.
+  ansible.builtin.assert:
+    that:
+      - al_agent_egress_host | length > 0
+    fail_msg: "al_agent_egress_host must not be an empty string."
+    quiet: true
+  when: al_agent_egress_host is defined
+
+- name: Assert al_agent_proxy_url is not empty when defined.
+  ansible.builtin.assert:
+    that:
+      - al_agent_proxy_url | length > 0
+    fail_msg: "al_agent_proxy_url must not be an empty string."
+    quiet: true
+  when: al_agent_proxy_url is defined

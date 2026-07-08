@@ -1,9 +1,17 @@
 ---
+- name: Validate role variables.
+  ansible.builtin.import_tasks: assert.yml
+  tags:
+    - always
 
-- include: _windows.yml
+- name: Include Windows tasks.
+  ansible.builtin.include_tasks: _windows.yml
   when: ansible_os_family == "Windows"
-  tags: [windows]
+  tags:
+    - windows
 
-- include: _linux.yml
-  tags: [al_agent]
+- name: Include Linux tasks.
+  ansible.builtin.include_tasks: _linux.yml
   when: ansible_os_family != "Windows"
+  tags:
+    - al_agent
