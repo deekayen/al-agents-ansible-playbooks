@@ -7,6 +7,4 @@
     state: present
   tags:
     - selinux
-  when:
-    - ansible_selinux
-    - ansible_selinux.status == 'enabled'
+  when: ansible_facts.selinux.status | default('disabled') == 'enabled'

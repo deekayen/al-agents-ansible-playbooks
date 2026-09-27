@@ -8,30 +8,31 @@ Forked from the abandoned project originally sponsored by Alert Logic at https:/
 
 ## Requirements
 
-The following platforms are supported.
+The following platforms are supported and tested with Molecule.
 
 Debian versions:
 
-* buster
-* bullseye
+* bookworm (12)
+* trixie (13)
 
 Ubuntu versions:
 
 * 22.04
-* 20.04
+* 24.04
+* 26.04
 
-RHEL/CentOS versions:
+RHEL/Rocky versions:
 
-* 7.x
-* 8.x
+* 9.x
+* 10.x
 
 Amazon Linux versions:
 
-* Karoo
+* 2023
 
-Windows versions:
+Windows versions (not covered by Molecule):
 
-* Windows Server 2016, 2019
+* Windows Server 2016, 2019, 2022
 
 ## Role Variables
 
