@@ -11,7 +11,7 @@
       register: apt_cache_result
       retries: 3
       until: apt_cache_result is success
-      when: ansible_os_family == "Debian"
+      when: ansible_facts.os_family == "Debian"
 
   roles:
     - role: deekayen.alagent

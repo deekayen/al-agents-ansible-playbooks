@@ -6,12 +6,12 @@
 
 - name: Include Windows tasks.
   ansible.builtin.include_tasks: _windows.yml
-  when: ansible_os_family == "Windows"
+  when: ansible_facts.os_family == "Windows"
   tags:
     - windows
 
 - name: Include Linux tasks.
   ansible.builtin.include_tasks: _linux.yml
-  when: ansible_os_family != "Windows"
+  when: ansible_facts.os_family != "Windows"
   tags:
     - al_agent
