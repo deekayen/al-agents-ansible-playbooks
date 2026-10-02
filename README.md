@@ -1,79 +1,181 @@
-# Ansible Role: alagent
+# deekayen.alagent
 
-[![Molecule](https://github.com/deekayen/al-agents-ansible-playbooks/actions/workflows/ci.yml/badge.svg)](https://github.com/deekayen/al-agents-ansible-playbooks/actions/workflows/ci.yml) [![Project Status: Inactive – The project has reached a stable, usable state but is no longer being actively developed; support/maintenance will be provided as time allows.](https://www.repostatus.org/badges/latest/inactive.svg)](https://www.repostatus.org/#inactive)
+[![CI](https://github.com/deekayen/al-agents-ansible-playbooks/actions/workflows/ci.yml/badge.svg)](https://github.com/deekayen/al-agents-ansible-playbooks/actions/workflows/ci.yml) [![Ansible Galaxy](https://img.shields.io/badge/galaxy-deekayen.alagent-blue.svg)](https://galaxy.ansible.com/ui/standalone/roles/deekayen/alagent/) [![Project Status: Inactive – The project has reached a stable, usable state but is no longer being actively developed; support/maintenance will be provided as time allows.](https://www.repostatus.org/badges/latest/inactive.svg)](https://www.repostatus.org/#inactive) ![Apache 2.0 license](https://img.shields.io/badge/license-Apache--2.0-blue)
 
-This playbook is used to install and configure the Alert Logic agent.
+An Ansible role that installs the Alert Logic agent on Linux and Windows hosts, provisions it with a registration key, and forwards the local syslog stream to it.
 
-Forked from the abandoned project originally sponsored by Alert Logic at https://github.com/alertlogic/al-agents-ansible-playbooks to have a workaround for https://github.com/alertlogic/al-agents-ansible-playbooks/issues/32 where GPG checks for RPMs caused installations to fail.
+On Linux, the role installs the vendor's `LATEST` package from `scc.alertlogic.net/software/` (a `.deb` on Debian and Ubuntu, an `.rpm` on the RedHat family and SUSE) after trusting the Alert Logic signing key. It then runs `/etc/init.d/al-agent configure` and `/etc/init.d/al-agent provision`, writes an rsyslog or syslog-ng drop-in that sends all messages to `127.0.0.1:1514`, labels TCP 1514 as `syslogd_port_t` when SELinux is enabled, and starts the `al-agent` service. On Windows, it downloads `al_agent-LATEST.msi` to `C:\TEMP` and installs it with `win_package`, which passes the provisioning options as MSI properties.
+
+The repository is named `al-agents-ansible-playbooks`, but it is a single role, and its Galaxy name is `deekayen.alagent`.
 
 ## Requirements
 
-The following platforms are supported and tested with Molecule.
+- ansible-core 2.15 or newer on the controller.
+- The `community.general` collection for the SELinux and SUSE tasks. Windows targets also need `ansible.windows`.
+- Outbound HTTPS from the target to `scc.alertlogic.net`.
+- Privilege escalation on Linux targets. Run the play with `become: true`; the role installs packages and writes under `/etc`.
+- Fact gathering left on. The role branches on `ansible_facts.os_family`, `ansible_facts.architecture`, and `ansible_facts.selinux`.
 
-Debian versions:
+## Supported platforms
 
-* bookworm (12)
-* trixie (13)
+| Platform | Versions |
+| --- | --- |
+| EL (Rocky Linux in CI) | 9, 10 |
+| Amazon Linux | 2023 |
+| Debian | 12 (bookworm), 13 (trixie) |
+| Ubuntu | 22.04 (jammy), 24.04 (noble), 26.04 (resolute) |
+| Windows | 2016, 2019, 2022 |
 
-Ubuntu versions:
+Molecule installs the agent on `rockylinux9`, `rockylinux10`, `amazonlinux2023`, `ubuntu2204`, `ubuntu2404`, `ubuntu2604`, `debian12`, and `debian13` containers. CI does not apply the role to Windows. The role also has a SUSE install path and `vars/Suse.yml`, but `meta/main.yml` does not list SUSE and CI does not run it.
 
-* 22.04
-* 24.04
-* 26.04
+## Installation
 
-RHEL/Rocky versions:
+From Ansible Galaxy:
 
-* 9.x
-* 10.x
+```bash
+ansible-galaxy role install deekayen.alagent
+ansible-galaxy collection install community.general
+```
 
-Amazon Linux versions:
+Or pin it in `requirements.yml`:
 
-* 2023
+```yaml
+---
+roles:
+  - name: deekayen.alagent
+    src: https://github.com/deekayen/al-agents-ansible-playbooks.git
+    scm: git
+    version: main
 
-Windows versions (not covered by Molecule):
+collections:
+  - name: community.general
+  - name: ansible.windows
+```
 
-* Windows Server 2016, 2019, 2022
+```bash
+ansible-galaxy install -r requirements.yml
+```
 
-## Role Variables
+## Role variables
 
-* `al_agent_registration_key` - your unique registration key, required except in supported cloud deployments (AWS, Azure) String defaults to `your_registration_key_here`
-* `al_agent_for_imaging` - The `al_agent_for_imaging` variable determines if the agent will be configured and provisioned.  If  set to `true` then the install process performs an installation of the agent but will not start the agent once installation is completed.  This allows for instance snapshots to be saved and started for later use.  With this variables set to `false` then the provisioning process is performed during setup and the agent is started once complete.  Boolean defaults to `false`
-* `al_agent_egress_host`,`al_agent_egress_port` - By default all traffic is sent to <https://vaporator.alertlogic.com.>  This variable is useful if you have a machine that is responsible for outbound traffic (NAT box).  If you specify your own URL ensure that it is a properly formatted URI.  String defaults to `https://vaporator.alertlogic.com`
-* `al_agent_proxy_url` - By default al-agent does not require the use of a proxy.  This variable is useful if you want to avoid a single point of egress.  When a proxy is used, both `al_agent_egress_host` and `al_agent_proxy_url` values are required.  If you specify a proxy URL ensure that it is a properly formatted URI.  String defaults to `nil`
+| Variable | Default | Description |
+| --- | --- | --- |
+| `disable_gpg_check` | `false` | Passed to `dnf` as `disable_gpg_check` when installing the RPM on RedHat-family hosts. Workaround for [alertlogic/al-agents-ansible-playbooks#32](https://github.com/alertlogic/al-agents-ansible-playbooks/issues/32), where RPM signature checks broke installs. It has no effect on Debian, Ubuntu, SUSE, or Windows. |
+| `al_agent_for_imaging` | `false` | Install the agent without starting the service, so an instance snapshot can become a machine image. On Windows, it passes `INSTALL_ONLY=1 PROV_NOW=0` to the MSI. See [Known issues](#known-issues) for Linux. |
+
+### Optional variables
+
+These have no default. The role checks each with `is defined`, and `tasks/assert.yml` fails the play if one is set to an empty string.
+
+| Variable | Description |
+| --- | --- |
+| `al_agent_registration_key` | Alert Logic registration key. Passed as `--key` to `al-agent provision` on Linux and as `PROV_KEY` on Windows. `meta/argument_specs.yml` describes it as optional in AWS and Azure deployments. Keep it in Ansible Vault or a secrets lookup; no task sets `no_log`, so it appears in verbose output. |
+| `al_agent_egress_host` | Single point of egress, such as a NAT instance. Passed as `--host` on Linux and `SENSOR_HOST` on Windows. |
+| `al_agent_egress_port` | Integer from 1 to 65535, enforced by `tasks/assert.yml`. Passed as `--port` on Linux only when `al_agent_egress_host` is also set, and as `SENSOR_PORT` on Windows. |
+| `al_agent_proxy_url` | Proxy for agent traffic. Passed as `--proxy` on Linux and `USE_PROXY` on Windows. |
+
+`vars/Debian.yml`, `vars/RedHat.yml`, and `vars/Suse.yml` hold the package URLs, architecture mapping, and signing key fingerprint for each OS family; they are internal values.
+
+## Behavior
+
+- The Linux configure and provision commands run only when `/var/alertlogic/etc/host_key.pem` is absent, and they report `changed` every time they run. On Windows, an existing `C:\Program Files (x86)\Common Files\AlertLogic\host_key.pem` switches the MSI to `INSTALL_ONLY=1 PROV_NOW=0`.
+- The packages are the vendor's `LATEST` builds. `apt`, `dnf`, and `zypper` install them when the package is absent and do not pin a version.
+- On Debian and Ubuntu, the signing key goes to `/etc/apt/trusted.gpg.d/alertlogic.asc` instead of `apt-key`. On the RedHat family, `rpm_key` imports it and checks fingerprint `9a2a3e9a817127b121b2b2fb00802f0e0186cc36`.
+- The rsyslog drop-in is `/etc/rsyslog.d/alertlogic.conf`. For syslog-ng, the role writes `/etc/syslog-ng/conf.d/alertlogic.conf` and adds an `include` line to `/etc/syslog-ng/syslog-ng.conf`. The role detects syslog-ng by the presence of `/etc/init.d/syslog-ng`.
+- Provisioning notifies a restart of `al-agent`; logger changes restart rsyslog or reload syslog-ng.
+- The Windows installer stays in `C:\TEMP\al_agent-LATEST.msi`, and the role creates `C:\TEMP` if it is missing.
 
 ## Dependencies
 
-* no known dependancies
+None.
 
-## Example Playbook
+## Example playbook
 
-    ---
-    - name: Apply AL Agent install to specific hosts
-      hosts: al_agents
-      roles:
-        - { role: deekayen.alagent}
+```yaml
+---
+- name: Install the Alert Logic agent.
+  hosts: alertlogic_monitored
+  become: true
 
-## Configurations
+  vars:
+    al_agent_registration_key: "{{ vault_al_agent_registration_key }}"
+    al_agent_egress_host: egress.example.internal
+    al_agent_egress_port: 443
 
-The variable `al_agent_for_imaging` determine your installation type.  It is a boolean value and by default is `false`.  Setting this value to true will prepare your agent for imaging only and will not provision the agent.
+  roles:
+    - deekayen.alagent
+```
 
-Performing an agent install using the cookbook's default attributes, will setup the agent and provision the instance immediately. If you have properly set your registration key, your host should appear within Alert Logic's Console within 15 minutes. Note: in AWS and Azure deployments the use of the key is optional and in general not necessary.
+`egress.example.internal` is a placeholder for an egress host, and `vault_al_agent_registration_key` is a placeholder for a vaulted variable.
 
-## Contributing
+## Tags
 
-1. Fork the repository on Github
-2. Create a named feature branch (like `add_component_x`)
-3. Write your change
-4. Write tests for your change (if applicable)
-5. Run the tests, ensuring they all pass
-6. Submit a Pull Request using Github
+| Tag | Tasks |
+| --- | --- |
+| `always` | Input validation and the OS family `include_vars`. |
+| `al_agent` | The include of all Linux tasks. |
+| `windows` | The include of all Windows tasks. |
+| `install_agent` | The include of the Linux package install tasks. |
+| `install_al_agent` | Linux package installs and the service start. |
+| `configure_al_agent` | Host key check and `al-agent configure`. |
+| `provision_al_agent` | Host key check, `al-agent provision`, and the logger configuration include. |
+| `rsyslog`, `syslog_ng`, `configure_al_agent_syslog` | Logger detection and drop-in files. |
+| `selinux` | The SELinux port rule. |
 
-## License and Authors
+`--skip-tags` works on any of these, and Molecule uses `--skip-tags provision_al_agent,configure_al_agent`. `--tags` does not select inner tags alone, because each task file is pulled in by an `include_tasks` that carries different tags. `--tags install_al_agent` runs only the validation tasks; `--tags al_agent,install_agent,install_al_agent` reaches the package installs but skips the untagged signing key import.
 
-License:
+## Known issues
 
-Distributed under the Apache 2.0 license.
+- `defaults/main.yml` describes `al_agent_for_imaging` as leaving the agent unprovisioned, but `tasks/provision_agent.yml` runs the same `/etc/init.d/al-agent provision` command when it is `true`. Only the restart handler and the service start are skipped. `tasks/configure_agent.yml` also runs in imaging mode.
+- `al_agent_initscript` and `al_agent_syslog_ng_source` are set in each `vars/*.yml` file, but no task or template reads them. `templates/etc/syslog-ng/alertlogic.conf` hardcodes `source(s_sys)`.
+- `meta/main.yml` lists Windows platforms, but neither `meta/main.yml` nor `molecule/default/requirements.yml` declares the `ansible.windows` collection that `tasks/_windows.yml` uses.
 
-Authors:
-Muram Mohamed (mmohamed@alertlogic.com)
-Justin Early (jearly@alertlogic.com)
+## Development
+
+CI runs on every push to `main` and every pull request (see `.github/workflows/ci.yml`):
+
+1. Lint: installs `community.general` from `molecule/default/requirements.yml`, then runs `ansible-lint --profile production` and `flake8 molecule/`.
+2. Molecule: converge, idempotence, and testinfra verification in Docker against each Linux distribution listed above. `molecule.yml` sets `ANSIBLE_SKIP_TAGS=provision_al_agent,configure_al_agent`, since those steps need a real registration key, so CI does not exercise provisioning or the syslog drop-ins.
+
+To run the same checks locally with Docker available:
+
+```bash
+pip3 install ansible-core ansible-lint flake8 molecule "molecule-plugins[docker]" docker pytest-testinfra
+ansible-galaxy install -r molecule/default/requirements.yml
+ansible-lint --profile production
+flake8 molecule/
+MOLECULE_DISTRO=rockylinux9 molecule test
+```
+
+`MOLECULE_DISTRO` selects a `geerlingguy/docker-<distro>-ansible` image. The testinfra checks in `molecule/default/tests/test_default.py` confirm that the `al-agent` package is installed, `/var/alertlogic/lib/agent/bin/al-agent` exists with mode `0755`, the signing key is trusted (the apt keyring file, or key ID `0186cc36` in the RPM database), and the `al-agent` service is enabled.
+
+### Repository layout
+
+| Path | Purpose |
+| --- | --- |
+| `tasks/main.yml` | Runs validation, then the Windows or Linux task file. |
+| `tasks/assert.yml` | Input validation, tagged `always`. |
+| `tasks/_linux.yml` | Orders the Linux install, configure, provision, logger, SELinux, and service steps. |
+| `tasks/_windows.yml` | Builds MSI properties, downloads, and installs the Windows agent. |
+| `tasks/install_agent.yml` | Signing key import and package install per OS family. |
+| `tasks/configure_agent.yml`, `tasks/provision_agent.yml` | `al-agent configure` and `al-agent provision`. |
+| `tasks/configure_loggers.yml`, `tasks/_rsyslog.yml`, `tasks/_syslog_ng.yml` | Syslog forwarding to port 1514. |
+| `tasks/selinux.yml` | SELinux port rule for TCP 1514. |
+| `templates/etc/` | rsyslog and syslog-ng drop-ins. |
+| `vars/` | Per-OS-family package URLs and key fingerprint. |
+| `defaults/main.yml` | The two user-facing variables with defaults. |
+| `meta/argument_specs.yml` | Argument spec, including the optional variables. |
+| `molecule/default/` | Molecule scenario: `prepare.yml`, `converge.yml`, requirements, and testinfra tests. |
+| `.github/workflows/` | `ci.yml` for lint and Molecule, `release.yml` for Galaxy import. |
+
+## Releases
+
+Pushing a git tag runs `.github/workflows/release.yml`, which imports the tagged commit into Ansible Galaxy as `deekayen.alagent`. The import needs a `GALAXY_API_KEY` repository or organization secret.
+
+## License
+
+Apache 2.0. See [LICENSE](LICENSE).
+
+## Authors
+
+Muram Mohamed, Justin Early, and Craig Davis wrote the original role for Alert Logic at [alertlogic/al-agents-ansible-playbooks](https://github.com/alertlogic/al-agents-ansible-playbooks). This repository is forked from [cbdr/al-agents-ansible-playbooks](https://github.com/cbdr/al-agents-ansible-playbooks) and maintained by [David Norman](https://github.com/deekayen). Sponsorship links are in [.github/FUNDING.yml](.github/FUNDING.yml).
